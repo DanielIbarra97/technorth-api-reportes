@@ -1,0 +1,12 @@
+# Dependencias de Node
+node_modules/
+
+# Archivos de Log
+npm-debug.log
+*.log
+
+# Llave secreta de Firebase
+serviceAccountKey.json
+
+# Archivos del sistema
+.DS_Store
