@@ -4,6 +4,13 @@ const PDFDocument = require('pdfkit');
 const admin = require('firebase-admin');
 const fs = require('fs'); // Para verificar que el logo existe
 
+// --- ✅ NUEVO: Función para formatear moneda ---
+// Esto agrega las comas (ej: $96,818.71)
+const formatMoney = (amount) => {
+  return "$" + amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+};
+// ------------------------------------------
+
 // Carga tus credenciales de Firebase
 try {
   const serviceAccount = require('./serviceAccountKey.json');
@@ -65,16 +72,22 @@ app.get('/report/sales', async (req, res) => {
     }
 
     // --- 3. Formato de Tabla (Aceptable a la vista) ---
-    let y = doc.y;
-    doc.fontSize(10).font('Helvetica-Bold');
-    // Encabezados de tabla
-    doc.text('Fecha', 60, y);
-    doc.text('Vendedor', 160, y);
-    doc.text('Subtotal', 360, y, { width: 80, align: 'right' });
-    doc.text('Total', 450, y, { width: 80, align: 'right' });
-    doc.moveDown();
-    const tableHeaderY = doc.y;
-    doc.moveTo(50, tableHeaderY).lineTo(550, tableHeaderY).strokeColor('gray').stroke();
+    const tableTopY = doc.y; // Guardamos la posición Y
+    const tableLeftX = 50;
+    const tableRightX = 550;
+
+    // ✅ MEJORA: Encabezado de tabla con fondo
+    doc.rect(tableLeftX, tableTopY, tableRightX - tableLeftX, 20) // (x, y, ancho, alto)
+       .fillColor('#F0F0F0') // Gris claro de fondo
+       .strokeColor('gray')
+       .fillAndStroke();
+    
+    doc.fillColor('black').fontSize(10).font('Helvetica-Bold');
+    doc.text('Fecha', 60, tableTopY + 5);
+    doc.text('Vendedor', 160, tableTopY + 5);
+    doc.text('Subtotal', 360, tableTopY + 5, { width: 80, align: 'right' });
+    doc.text('Total', 450, tableTopY + 5, { width: 80, align: 'right' });
+    doc.moveDown(2); // Espacio después del header
 
     doc.font('Helvetica');
     let totalGeneral = 0;
@@ -88,21 +101,26 @@ app.get('/report/sales', async (req, res) => {
       const total = sale.total || 0;
       totalGeneral += total;
 
-      y = doc.y + 10;
+      const y = doc.y + 5; // Damos un poco de padding
       doc.fontSize(9).text(date, 60, y);
       doc.text(employee, 160, y, { width: 200 });
-      doc.text(`$${subtotal.toFixed(2)}`, 360, y, { width: 80, align: 'right' });
-      doc.text(`$${total.toFixed(2)}`, 450, y, { width: 80, align: 'right' });
+      // ✅ MEJORA: Usamos la función formatMoney
+      doc.text(formatMoney(subtotal), 360, y, { width: 80, align: 'right' });
+      doc.text(formatMoney(total), 450, y, { width: 80, align: 'right' });
       doc.moveDown();
     }
     
     // --- 4. Total Final ---
     const tableFooterY = doc.y + 10;
-    doc.moveTo(50, tableFooterY).lineTo(550, tableFooterY).strokeColor('black').stroke();
-    doc.moveDown();
+    doc.moveTo(tableLeftX, tableFooterY).lineTo(tableRightX, tableFooterY).strokeColor('black').stroke();
+    doc.moveDown(1.5);
+    
+    // ✅ MEJORA: Alineación profesional del Total
     doc.font('Helvetica-Bold').fontSize(12);
-    doc.text('Total General:', 340, doc.y);
-    doc.text(`$${totalGeneral.toFixed(2)}`, 450, doc.y, { width: 80, align: 'right' });
+    // Ponemos el texto "Total General:" alineado a la derecha, bajo la columna "Subtotal"
+    doc.text('Total General:', 360, doc.y, { width: 80, align: 'right' });
+    // Ponemos el número final alineado a la derecha, bajo la columna "Total"
+    doc.text(formatMoney(totalGeneral), 450, doc.y, { width: 80, align: 'right' });
     
     // Finalizar el PDF
     doc.end();
